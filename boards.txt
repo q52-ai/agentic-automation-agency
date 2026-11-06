@@ -1,0 +1,45 @@
+# Company job boards to sweep every few hours (AGENCY_BOARDS_HOURS).
+# One per line: greenhouse:<board token> or ashby:<organization>. The token is the last part of the
+# company's careers URL, e.g. boards.greenhouse.io/stripe -> greenhouse:stripe, jobs.ashbyhq.com/ramp -> ashby:ramp.
+# Big employers rarely post freelance work; add agencies, startups and companies that hire contractors.
+
+greenhouse:gitlab
+greenhouse:airbnb
+greenhouse:stripe
+greenhouse:reddit
+greenhouse:robinhood
+greenhouse:pinterest
+greenhouse:cloudflare
+greenhouse:datadog
+greenhouse:figma
+greenhouse:discord
+greenhouse:duolingo
+greenhouse:dropbox
+greenhouse:coinbase
+greenhouse:instacart
+greenhouse:lyft
+greenhouse:twitch
+greenhouse:squarespace
+greenhouse:asana
+greenhouse:gusto
+greenhouse:upwork
+
+ashby:ramp
+ashby:notion
+ashby:openai
+ashby:cohere
+ashby:elevenlabs
+ashby:writer
+ashby:harvey
+ashby:linear
+ashby:replit
+ashby:supabase
+ashby:posthog
+ashby:plaid
+ashby:perplexity
+ashby:cursor
+ashby:modal
+ashby:n8n
+ashby:ashby
+ashby:zapier
+ashby:runway

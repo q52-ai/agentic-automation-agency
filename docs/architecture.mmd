@@ -1,0 +1,114 @@
+flowchart TD
+    %% Legend
+    %%   Rounded node    = LLM agent (blue)
+    %%   Rectangle       = deterministic code (gray)
+    %%   Diamond         = router or control gate (amber)
+    %%   Hexagon         = human owner (red)
+    %%   Cylinder        = shared state (green)
+    %%   Stadium, dashed = start or end (white)
+    %%   Solid arrows = control flow; dotted arrows = reads and writes to shared state
+
+    classDef agent fill:#e8f0fe,stroke:#1a73e8,color:#0b2a5b
+    classDef det fill:#f1f3f4,stroke:#5f6368,color:#202124
+    classDef router fill:#fef7e0,stroke:#f9ab00,color:#4a3500
+    classDef human fill:#fce8e6,stroke:#d93025,color:#5c0a05
+    classDef state fill:#e6f4ea,stroke:#188038,color:#0d3b1a
+    classDef term fill:#ffffff,stroke:#5f6368,color:#202124,stroke-dasharray:5 4
+
+    START(["Cycle: every 30 min, a pasted posting, or Run cycle now"]):::term
+
+    subgraph SRC["Sources"]
+        direction LR
+        F1["Remote OK API"]:::det
+        F2["We Work Remotely RSS"]:::det
+        F3["HN Who is hiring"]:::det
+        F4["Reddit API, if keyed"]:::det
+        F5["Greenhouse and Ashby boards, every 6 h"]:::det
+        F6{{"Pasted by hand: LinkedIn, Upwork, Indeed, Craigslist"}}:::human
+    end
+
+    subgraph S1["Stage 1: Scout"]
+        DEDUPE{"Seen before?"}:::router
+        PRE{"Full-time, older than 21 days, or no gig signal?"}:::router
+        IGN(["Ignored: never sent to Claude"]):::term
+        FOUND["Lead stored as found"]:::det
+        DEDUPE -- "no" --> PRE
+        PRE -- "yes" --> IGN
+        PRE -- "no" --> FOUND
+    end
+
+    subgraph S2["Stage 2: Qualifier"]
+        QUAL("Haiku 5.5: verdict, fit, plan, red flags, batches of 10"):::agent
+        VER{"Verdict and fit"}:::router
+        REJ(["Rejected with reason"]):::term
+        MAYBE["Maybe: waits for the owner"]:::det
+        QUAL --> VER
+        VER -- "reject" --> REJ
+        VER -- "maybe, or pursue below 70" --> MAYBE
+    end
+
+    subgraph S3["Stage 3: Proposal writer"]
+        WRITE("Opus 5.5: AI-forward pitch, quote, questions, demo brief"):::agent
+    end
+
+    subgraph S4["Stage 4: Demo builder"]
+        DB{"Demo worth building and under 2 today, or queued?"}:::router
+        BUILD("Opus 5.5, streamed: runnable offline prototype"):::agent
+        SAFE["Sanitize paths, cap size, write to demos folder, never run"]:::det
+        FAIL["Mark build failed, offer retry"]:::det
+        DB -- "yes" --> BUILD
+        BUILD -- "ok" --> SAFE
+        BUILD -- "refused or error" --> FAIL
+    end
+
+    subgraph S5["Stage 5: Owner review"]
+        READY["Ready for you card: plan, editable proposal, demo"]:::det
+        OWN{{"Owner: run the demo, edit, submit on the site"}}:::human
+        DEC{"Decision"}:::router
+        SKIP(["Skipped"]):::term
+        READY --> OWN
+        OWN --> DEC
+        DEC -- "skip" --> SKIP
+    end
+
+    subgraph S6["Stage 6: Pipeline"]
+        APPLIED["Applied"]:::det
+        OUT{"Client decision"}:::router
+        LOST(["Lost"]):::term
+        WON["Won, then delivered"]:::det
+        PAID(["Paid: revenue recorded"]):::term
+        APPLIED --> OUT
+        OUT -- "no" --> LOST
+        OUT -- "yes" --> WON
+        WON --> PAID
+    end
+
+    subgraph STATE["Shared state (SQLite, WAL)"]
+        direction LR
+        G[("gigs: posting, status, fit, assessment, proposal, demo, revenue")]:::state
+        C[("state: demos per day, build queue, source health")]:::state
+        E[("events: every agent message")]:::state
+    end
+
+    DASH["Dashboard: live event stream, queue, pipeline"]:::det
+
+    START --> SRC
+    SRC --> DEDUPE
+    FOUND --> QUAL
+    VER -- "pursue, fit 70 or more" --> WRITE
+    MAYBE -- "owner presses Pursue" --> WRITE
+    WRITE --> DB
+    DB -- "no" --> READY
+    SAFE --> READY
+    FAIL --> READY
+    DEC -- "build demo" --> DB
+    DEC -- "mark applied" --> APPLIED
+
+    FOUND -.-> G
+    VER -.-> G
+    WRITE -.-> G
+    SAFE -.-> G
+    BUILD -.-> C
+    PAID -.-> G
+    E -.-> DASH
+    DASH --> OWN

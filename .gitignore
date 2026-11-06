@@ -1,0 +1,7 @@
+.venv/
+data/
+demos/
+.env
+*.key
+*.pem
+__pycache__/

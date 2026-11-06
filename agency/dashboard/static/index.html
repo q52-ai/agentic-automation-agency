@@ -1,0 +1,606 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Automation Agency</title>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f4f5f7; --panel: #ffffff; --ink: #14181f; --ink-2: #3d4452; --muted: #6b7280; --line: #e3e6eb;
+  --pos: #12805c; --neg: #c4321c; --warn: #a15c00; --info: #2459c7;
+  --pos-bg: #e6f4ee; --neg-bg: #fbeae7; --warn-bg: #fdf1e1; --info-bg: #e8eefb; --neutral-bg: #eef0f3;
+  /* Agent identity: categorical slots 1-5 of the validated reference palette, in fixed order; ops is neutral. */
+  --a-scout: #2a78d6; --a-qualifier: #eb6834; --a-writer: #1baf7a; --a-builder: #eda100; --a-you: #e87ba4; --a-agency: #8b919c;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --bg: #0f1218; --panel: #171b23; --ink: #e7eaf0; --ink-2: #c3c8d2; --muted: #8b93a3; --line: #262c37;
+    --pos: #3ccf91; --neg: #ff7a66; --warn: #f2a54a; --info: #7aa2ff;
+    --pos-bg: #12291f; --neg-bg: #2e1612; --warn-bg: #2d200e; --info-bg: #141f38; --neutral-bg: #1f2430;
+    --a-scout: #3987e5; --a-qualifier: #d95926; --a-writer: #199e70; --a-builder: #c98500; --a-you: #d55181; --a-agency: #6b7280;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f1218; --panel: #171b23; --ink: #e7eaf0; --ink-2: #c3c8d2; --muted: #8b93a3; --line: #262c37;
+  --pos: #3ccf91; --neg: #ff7a66; --warn: #f2a54a; --info: #7aa2ff;
+  --pos-bg: #12291f; --neg-bg: #2e1612; --warn-bg: #2d200e; --info-bg: #141f38; --neutral-bg: #1f2430;
+  --a-scout: #3987e5; --a-qualifier: #d95926; --a-writer: #199e70; --a-builder: #c98500; --a-you: #d55181; --a-agency: #6b7280;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+a { color: var(--info); }
+.feed, .log, .scroll, textarea { scrollbar-color: var(--line) transparent; scrollbar-width: thin; }
+.wrap { max-width: 1520px; margin: 0 auto; padding: 16px; }
+header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0; font-weight: 600; }
+section { margin-bottom: 14px; }
+.section-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin-bottom: 10px; }
+.section-head .note { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.badges { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.badge { font-size: 11px; font-weight: 700; letter-spacing: .06em; padding: 3px 8px; border-radius: 999px; text-transform: uppercase; }
+.st-running { background: var(--pos-bg); color: var(--pos); }
+.st-paused { background: var(--warn-bg); color: var(--warn); }
+.pulse { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 5px; vertical-align: 1px; }
+.st-running .pulse { animation: pulse 1.4s infinite; }
+@keyframes pulse { 50% { opacity: .25; } }
+.controls { display: flex; gap: 8px; flex-wrap: wrap; }
+button { font: inherit; font-size: 13px; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--ink); cursor: pointer; }
+button:hover { border-color: var(--muted); }
+button.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); font-weight: 600; }
+button.small { padding: 4px 9px; font-size: 12px; }
+button:disabled { opacity: .5; cursor: default; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; min-width: 0; }
+.up { color: var(--pos); } .down { color: var(--neg); }
+.conn { font-size: 11px; color: var(--muted); }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; flex: none; }
+code, .mono { font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* KPIs */
+.kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-bottom: 10px; }
+.kpi .label { font-size: 12px; color: var(--muted); }
+.kpi .value { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.kpi .sub { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.bar { height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; margin-top: 8px; }
+.bar > div { height: 100%; background: var(--info); width: 0; transition: width .6s; }
+.ticker { font-size: 13px; color: var(--muted); margin: 0 0 14px; min-height: 19px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Ready for you */
+.ready { display: grid; grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); gap: 12px; }
+.gig { background: var(--panel); border: 1px solid var(--line); border-top: 4px solid var(--agent); border-radius: 12px;
+  padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.gig .top { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.gig .title { font-weight: 650; font-size: 15px; line-height: 1.35; }
+.gig .title a { color: var(--ink); text-decoration: none; } .gig .title a:hover { text-decoration: underline; }
+.fit { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--info-bg); color: var(--info); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.plan { font-size: 13px; color: var(--ink-2); display: grid; grid-template-columns: 4.2em 1fr; gap: 2px 8px; }
+.plan b { color: var(--muted); font-weight: 600; font-size: 12px; }
+.gig label { font-size: 12px; color: var(--muted); }
+.gig textarea { width: 100%; min-height: 170px; resize: vertical; font-family: inherit; font-size: 13px; line-height: 1.5; color: var(--ink);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.gig details { font-size: 13px; color: var(--ink-2); }
+.gig details summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+.gig details ul { margin: 6px 0; padding-left: 18px; }
+.demo { font-size: 13px; padding: 8px 10px; border-radius: 8px; background: var(--neutral-bg); color: var(--ink-2); overflow-wrap: anywhere; }
+.demo.ready-demo { background: var(--pos-bg); }
+.demo.working { background: var(--warn-bg); }
+.demo b { color: var(--ink); }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
+.actions .spacer { flex: 1; }
+.empty-state { padding: 26px; text-align: center; color: var(--muted); }
+
+/* Status pills (always text-labelled) */
+.pill { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 4px; letter-spacing: .03em; text-transform: uppercase; white-space: nowrap; }
+.pill.pos { background: var(--pos-bg); color: var(--pos); } .pill.neg { background: var(--neg-bg); color: var(--neg); }
+.pill.warn { background: var(--warn-bg); color: var(--warn); } .pill.info { background: var(--info-bg); color: var(--info); }
+.pill.neutral { background: var(--neutral-bg); color: var(--ink-2); }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+td { padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.t-title { font-weight: 600; }
+.t-sub { font-size: 12px; color: var(--muted); }
+.scroll { max-height: 420px; overflow-y: auto; }
+.fitcell { display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.fitbar { width: 44px; height: 6px; background: var(--line); border-radius: 99px; overflow: hidden; flex: none; }
+.fitbar div { height: 100%; background: var(--info); border-radius: 99px; }
+
+/* Agents */
+.agents { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.agent { border-top: 4px solid var(--agent); display: flex; flex-direction: column; padding: 12px; }
+.agent .ahead { display: flex; align-items: center; gap: 8px; }
+.agent .aname { font-weight: 650; font-size: 14px; }
+.agent .last { margin-left: auto; font-size: 11px; color: var(--muted); white-space: nowrap; }
+.agent .role { font-size: 12px; color: var(--muted); margin: 2px 0 6px; }
+.agent .stats { font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; padding: 6px 8px; background: var(--neutral-bg);
+  border-radius: 6px; margin-bottom: 8px; min-height: 30px; }
+.feed { display: flex; flex-direction: column; gap: 6px; height: 260px; overflow-y: auto; padding-right: 2px; }
+.card { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font-size: 12.5px; background: var(--panel);
+  animation: slide .35s ease-out; overflow-wrap: anywhere; }
+@keyframes slide { from { opacity: 0; transform: translateY(-6px); } }
+.card .meta { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+.card.t-pos { background: var(--pos-bg); } .card.t-neg { background: var(--neg-bg); } .card.t-warn { background: var(--warn-bg); }
+.card.muted { color: var(--muted); }
+.kind { font-size: 10px; font-weight: 700; letter-spacing: .05em; padding: 1px 6px; border-radius: 4px; text-transform: uppercase; }
+.kind.pos { background: var(--pos-bg); color: var(--pos); } .kind.neg { background: var(--neg-bg); color: var(--neg); }
+.kind.warn { background: var(--warn-bg); color: var(--warn); } .kind.info { background: var(--info-bg); color: var(--info); }
+.kind.neutral { background: var(--neutral-bg); color: var(--ink-2); }
+.card.t-pos .kind.pos, .card.t-neg .kind.neg, .card.t-warn .kind.warn { background: var(--panel); }
+.empty { color: var(--muted); font-size: 12px; padding: 8px 2px; }
+
+/* Lower panels */
+.lower { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 12px; }
+.sources { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.src { display: grid; grid-template-columns: 9.5em 1fr; gap: 8px; align-items: baseline; }
+.src .n { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.src .err { color: var(--neg); font-size: 12px; }
+.fineprint { font-size: 12px; color: var(--muted); margin: 10px 0 0; }
+form.add { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+form.add input, form.add textarea { font: inherit; font-size: 13px; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 8px; padding: 7px 9px; width: 100%; }
+form.add textarea { min-height: 110px; resize: vertical; }
+
+/* Event log */
+.filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.filters button { padding: 3px 10px 3px 8px; font-size: 12px; border-radius: 999px; display: flex; align-items: center; gap: 6px; }
+.filters button.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.log { height: 380px; overflow-y: auto; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.log .line { display: grid; grid-template-columns: 8.5em 10em 6.5em 1fr; gap: 8px; padding: 3px 8px; border-left: 4px solid var(--agent);
+  margin-bottom: 2px; border-radius: 2px; align-items: baseline; }
+.log .line:nth-child(odd) { background: var(--neutral-bg); }
+.log .c { color: var(--muted); white-space: nowrap; }
+.log .who { display: flex; align-items: center; gap: 6px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.log .msg { overflow-wrap: anywhere; }
+
+.toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg);
+  padding: 8px 14px; border-radius: 8px; font-size: 13px; box-shadow: 0 4px 14px rgba(0,0,0,.2); }
+
+@media (max-width: 1200px) { .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } .agents { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 1000px) { .lower { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 700px) {
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .agents { grid-template-columns: minmax(0, 1fr); }
+  .ready { grid-template-columns: minmax(0, 1fr); }
+  .feed { height: 220px; }
+  .log .line { grid-template-columns: 1fr; gap: 0; }
+  .hide-sm { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="badges">
+      <h1>Automation Agency</h1>
+      <span id="status" class="badge"><span class="pulse"></span><span id="status-text">connecting</span></span>
+      <span id="conn" class="conn"></span>
+    </div>
+    <div class="controls">
+      <button id="btn-pause">Pause</button>
+      <button id="btn-step" title="Check every source now and work the pipeline">Run cycle now</button>
+    </div>
+  </header>
+
+  <div class="kpis">
+    <div class="panel kpi"><div class="label">Postings scanned today</div><div class="value" id="k-leads">–</div><div class="sub" id="k-leads-sub">–</div></div>
+    <div class="panel kpi"><div class="label">Shortlisted</div><div class="value" id="k-short">–</div><div class="sub" id="k-short-sub">–</div></div>
+    <div class="panel kpi"><div class="label">Ready for you</div><div class="value" id="k-ready">–</div><div class="sub" id="k-ready-sub">–</div></div>
+    <div class="panel kpi"><div class="label">Applied → won</div><div class="value" id="k-won">–</div><div class="sub" id="k-won-sub">–</div></div>
+    <div class="panel kpi"><div class="label">Revenue</div><div class="value" id="k-rev">–</div><div class="sub" id="k-rev-sub">–</div></div>
+    <div class="panel kpi"><div class="label">Claude spend today</div><div class="value" id="k-cost">–</div>
+      <div class="bar"><div id="k-cost-bar"></div></div><div class="sub" id="k-cost-sub">–</div></div>
+  </div>
+  <div class="ticker" id="ticker"></div>
+
+  <section>
+    <div class="section-head"><h2>Ready for you</h2><span class="note" id="ready-note">Proposals the agents drafted. Review, edit, submit on the site yourself, then mark it applied.</span></div>
+    <div class="ready" id="ready"></div>
+  </section>
+
+  <section class="panel">
+    <div class="section-head"><h2>Pipeline</h2><span class="note">Gigs you've applied to, from applied to paid</span></div>
+    <div class="scroll" id="pipeline"></div>
+  </section>
+
+  <section>
+    <div class="section-head"><h2>Agents</h2><span class="note">Each agent's messages as they happen. Work flows scout → qualifier → writer → builder → you.</span></div>
+    <div class="agents" id="agents"></div>
+  </section>
+
+  <section class="lower">
+    <div class="panel">
+      <div class="section-head"><h2>Recently screened</h2><span class="note" id="screened-note"></span></div>
+      <div class="scroll" id="screened"></div>
+    </div>
+    <div class="panel">
+      <div class="section-head"><h2>Sources</h2></div>
+      <div class="sources" id="sources"></div>
+      <p class="fineprint">Includes jobs from <a href="https://remoteok.com">Remote OK</a>. LinkedIn, Indeed, Craigslist and Upwork don't allow automated collection, so paste interesting postings from them below.</p>
+      <div class="section-head" style="margin-top:16px"><h2>Add a posting by hand</h2></div>
+      <form class="add" id="add-form">
+        <input id="add-url" type="url" placeholder="Link to the posting (optional)">
+        <input id="add-title" placeholder="Title (optional)">
+        <textarea id="add-text" placeholder="Paste the posting text here" required></textarea>
+        <div><button class="primary" type="submit">Screen it</button></div>
+      </form>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="section-head"><h2>Full event log</h2><span class="note">Newest at the bottom</span></div>
+    <div class="filters" id="filters"></div>
+    <div class="log" id="log"></div>
+  </section>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const usd = (x) => (x < 0 ? "-$" : "$") + Math.abs(x).toFixed(2);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const safeUrl = (u) => /^https?:\/\//i.test(u || "") ? u : "";
+
+// Every agent gets a fixed identity color (never reassigned by rank or by which agents are active).
+const AGENTS = [
+  { id: "scout", name: "Scout", role: "Checks the job feeds and company boards for freelance and contract work" },
+  { id: "qualifier", name: "Qualifier", role: "Screens each lead: could an AI agent do this, and is it worth it?" },
+  { id: "writer", name: "Proposal writer", role: "Drafts an honest, AI-forward pitch for each shortlisted gig" },
+  { id: "builder", name: "Demo builder", role: "Builds a small working prototype to attach to the best pitches" },
+  { id: "you", name: "You", role: "Review, submit, and track what happens next" },
+  { id: "agency", name: "Agency operations", role: "Cycles, budget and system notices" },
+];
+const BY_ID = Object.fromEntries(AGENTS.map((a) => [a.id, a]));
+const agentOf = (id) => BY_ID[id] || BY_ID.agency;
+const color = (id) => `var(--a-${id})`;
+const SOURCE_NAMES = { remoteok: "Remote OK", weworkremotely: "We Work Remotely", hackernews: "Hacker News", greenhouse: "Greenhouse boards",
+  ashby: "Ashby boards", reddit: "Reddit", manual: "Added by hand" };
+const STATUS = {
+  found: ["waiting", "neutral"], shortlisted: ["shortlisted", "info"], maybe: ["maybe", "neutral"], rejected: ["rejected", "neutral"],
+  drafted: ["drafted", "info"], building: ["building demo", "warn"], demo_ready: ["demo ready", "pos"], applied: ["applied", "info"],
+  skipped: ["skipped", "neutral"], won: ["won", "pos"], lost: ["lost", "neg"], delivered: ["delivered", "pos"], paid: ["paid", "pos"],
+};
+const pill = (status) => { const [label, tone] = STATUS[status] || [status, "neutral"]; return `<span class="pill ${tone}">${esc(label)}</span>`; };
+
+let state = null, filter = "all", refreshTimer = null;
+const FEED_MAX = 40, LOG_MAX = 600;
+const drafts = {};  // unsaved proposal edits survive re-renders
+
+function time(ts) { return new Date(ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }); }
+function ago(ts) {
+  const s = Date.now() / 1000 - ts;
+  if (s < 60) return "just now";
+  if (s < 3600) return Math.round(s / 60) + "m ago";
+  if (s < 86400) return Math.round(s / 3600) + "h ago";
+  return Math.round(s / 86400) + "d ago";
+}
+function toast(msg) {
+  const t = document.createElement("div"); t.className = "toast"; t.textContent = msg;
+  document.body.append(t); setTimeout(() => t.remove(), 2200);
+}
+
+function kindOf(ev) {
+  switch (ev.kind) {
+    case "scan": return { label: "scan", tone: "neutral" };
+    case "thinking": return { label: "working", tone: "neutral" };
+    case "shortlist": return { label: "shortlist", tone: "pos", card: "t-pos" };
+    case "maybe": return { label: "maybe", tone: "info" };
+    case "reject": return { label: "pass", tone: "neutral", card: "muted" };
+    case "summary": return { label: "summary", tone: "info" };
+    case "draft": return { label: "proposal", tone: "pos", card: "t-pos" };
+    case "demo": return { label: "demo", tone: "pos", card: "t-pos" };
+    case "error": return { label: "error", tone: "neg", card: "t-neg" };
+    case "won": case "paid": case "delivered": return { label: ev.kind, tone: "pos", card: "t-pos" };
+    case "lost": return { label: "lost", tone: "neg" };
+    case "applied": return { label: "applied", tone: "info" };
+    case "cycle": return { label: "cycle", tone: "neutral" };
+    default: return { label: ev.kind, tone: "neutral" };
+  }
+}
+
+// --- agents ------------------------------------------------------------------------
+function buildAgents() {
+  $("agents").innerHTML = AGENTS.map((a) => `
+    <div class="panel agent" style="--agent:${color(a.id)}">
+      <div class="ahead"><span class="dot" style="background:${color(a.id)}"></span><span class="aname">${esc(a.name)}</span><span class="last" id="last-${a.id}"></span></div>
+      <div class="role">${esc(a.role)}</div>
+      <div class="stats" id="stats-${a.id}"></div>
+      <div class="feed" id="feed-${a.id}"><div class="empty">Waiting for activity…</div></div>
+    </div>`).join("");
+}
+
+function addCard(ev, animate = true) {
+  const a = agentOf(ev.agent);
+  const feed = $("feed-" + a.id);
+  if (!feed) return;
+  feed.querySelector(".empty")?.remove();
+  const k = kindOf(ev);
+  const card = document.createElement("div");
+  card.className = "card " + (k.card || "");
+  if (!animate) card.style.animation = "none";
+  card.innerHTML = `<div class="meta"><span class="kind ${k.tone}">${esc(k.label)}</span><span>C${ev.cycle} · ${time(ev.ts)}</span></div>${esc(ev.message)}`;
+  feed.prepend(card);
+  while (feed.children.length > FEED_MAX) feed.lastChild.remove();
+  const last = $("last-" + a.id);
+  last.textContent = ago(ev.ts); last.dataset.ts = ev.ts;
+}
+
+function todayCount(agent, kinds) {
+  const today = new Date().toDateString();
+  return state.events.filter((e) => e.agent === agent && kinds.includes(e.kind) && new Date(e.ts * 1000).toDateString() === today).length;
+}
+
+function renderAgentStats() {
+  const s = state, c = s.counts, spend = s.spend_by_agent;
+  const srcs = Object.values(s.sources);
+  $("stats-scout").textContent = srcs.length
+    ? `${srcs.filter((x) => x.ok).length} of ${srcs.length} sources OK · ${s.found_today.toLocaleString()} postings found today · every ${s.scout_minutes} min`
+    : "First sweep pending";
+  $("stats-qualifier").textContent = s.claude_on
+    ? `${(c.found || 0)} waiting · today ${todayCount("qualifier", ["shortlist"])} shortlisted, ${todayCount("qualifier", ["maybe"])} maybe, ${todayCount("qualifier", ["reject"])} passed · ${s.models.qualifier} · ${usd(spend.qualifier)} all time`
+    : "Off: add ANTHROPIC_API_KEY to .env";
+  $("stats-writer").textContent = `${(c.shortlisted || 0)} to write · ${todayCount("writer", ["draft"])} drafted today · ${s.models.writer} · ${usd(spend.writer)} all time`;
+  $("stats-builder").textContent = `${s.demos_today} of ${s.demos_per_day} demos today · ${s.build_queue.length} queued · ${s.models.builder} · ${usd(spend.builder)} all time`;
+  const pipe = ["applied", "won", "delivered", "paid", "lost"].map((k) => c[k] || 0);
+  $("stats-you").textContent = `${READY_COUNT()} to review · ${pipe[0]} applied · ${pipe[1] + pipe[2] + pipe[3]} won · ${pipe[4]} lost`;
+  $("stats-agency").textContent = `Cycle ${s.cycle} · ${s.status}${s.busy ? ", working" : ""} · Claude ${usd(s.spend_today)} of ${usd(s.budget)} today`;
+}
+const READY_COUNT = () => ["drafted", "building", "demo_ready"].reduce((t, k) => t + (state.counts[k] || 0), 0);
+
+// --- ready for you --------------------------------------------------------------------
+function demoBlock(g) {
+  const d = g.demo, p = g.proposal || {};
+  const queued = state.build_queue.includes(g.uid);
+  if (g.status === "building") return `<div class="demo working"><b>Building a demo…</b> ${esc(p.demo_brief)}</div>`;
+  if (d && !d.failed) {
+    return `<div class="demo ready-demo"><b>Demo ready</b> · ${esc(d.summary)}<br>
+      <span class="mono">${esc(d.dir)}</span><br>
+      Run: <code>${esc(d.run_command)}</code><br>
+      <span class="t-sub">${d.files.length} files: ${esc(d.files.join(", "))}. Run it and check it yourself, then push it somewhere and replace [DEMO LINK].</span>
+      ${d.skipped?.length ? `<br><span class="down">Skipped: ${esc(d.skipped.join(", "))}</span>` : ""}</div>`;
+  }
+  if (d?.failed) return `<div class="demo">The demo build didn't finish. <button class="small" data-act="build" data-uid="${esc(g.uid)}">Try again</button></div>`;
+  if (queued) return `<div class="demo">Demo queued; the builder picks it up on the next cycle.</div>`;
+  if (p.demo_worth_building) {
+    const full = state.demos_today >= state.demos_per_day;
+    return `<div class="demo">Demo planned: ${esc(p.demo_brief)}${full ? ` <span class="t-sub">(today's ${state.demos_per_day} demos are done)</span>` : ""}</div>`;
+  }
+  return "";
+}
+
+function renderReady() {
+  const gigs = state.ready;
+  $("ready-note").textContent = gigs.length
+    ? `${gigs.length} waiting. Review, edit, submit on the site yourself, then mark it applied.`
+    : "Proposals the agents drafted show up here.";
+  // Don't re-render a card the person is typing in.
+  const focused = document.activeElement?.closest?.(".gig")?.dataset.uid;
+  if (focused && gigs.some((g) => g.uid === focused)) return;
+  if (!gigs.length) {
+    const waiting = (state.counts.found || 0) + (state.counts.shortlisted || 0);
+    $("ready").innerHTML = `<div class="panel empty-state">${waiting ? `The agents are working through ${waiting} leads.` : "No proposals yet. The scout checks for new gigs every " + state.scout_minutes + " minutes."}</div>`;
+    return;
+  }
+  $("ready").innerHTML = gigs.map((g) => {
+    const a = g.assessment || {}, p = g.proposal || {};
+    const agent = g.status === "drafted" ? "writer" : "builder";
+    const url = safeUrl(g.url);
+    const meta = [SOURCE_NAMES[g.source] || g.source, g.company, g.kind, g.pay || a.pay_estimate].filter(Boolean).map(esc).join(" · ");
+    return `<div class="gig" data-uid="${esc(g.uid)}" style="--agent:${color(agent)}">
+      <div class="top"><span>${meta}</span><span class="fit" title="Qualifier's fit score, 0-100">fit ${g.fit}</span></div>
+      <div class="title">${url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(g.title)}</a>` : esc(g.title)} ${pill(g.status)}</div>
+      <div class="plan"><b>Bot</b><span>${esc(a.automation_plan)}</span><b>Human</b><span>${esc(a.human_part || "Review before delivery")}</span>
+        <b>Effort</b><span>${a.effort_hours ?? "?"} h · ${esc(a.deliverable)}${a.red_flags?.length ? ` · <span class="down">${esc(a.red_flags.join("; "))}</span>` : ""}</span></div>
+      <label>${esc(p.subject || "Proposal")}</label>
+      <textarea data-uid="${esc(g.uid)}">${esc(drafts[g.uid] ?? p.message ?? "")}</textarea>
+      <details><summary>Approach, quote and questions</summary>
+        <ul>${(p.approach || []).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
+        <div><b>Timeline:</b> ${esc(p.timeline)}</div>
+        <div><b>Quote:</b> ${esc(p.price_quote)}</div>
+        ${p.questions?.length ? `<div><b>Questions for the client:</b><ul>${p.questions.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
+      </details>
+      ${demoBlock(g)}
+      <div class="actions">
+        <button class="small" data-act="copy" data-uid="${esc(g.uid)}">Copy proposal</button>
+        ${url ? `<button class="small" data-act="open" data-url="${esc(url)}">Open posting ↗</button>` : ""}
+        <button class="small" data-act="save" data-uid="${esc(g.uid)}">Save edits</button>
+        ${!g.demo || g.demo.failed ? (g.status === "building" || state.build_queue.includes(g.uid) ? "" : `<button class="small" data-act="build" data-uid="${esc(g.uid)}">Build demo</button>`) : ""}
+        <span class="spacer"></span>
+        <button class="small" data-act="skipped" data-uid="${esc(g.uid)}">Skip</button>
+        <button class="small primary" data-act="applied" data-uid="${esc(g.uid)}">Mark applied</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+// --- pipeline & screened -----------------------------------------------------------------
+function renderPipeline() {
+  const rows = state.pipeline;
+  if (!rows.length) { $("pipeline").innerHTML = `<div class="empty">Nothing applied yet. Gigs move here when you press Mark applied.</div>`; return; }
+  const next = { applied: ["won", "lost"], won: ["delivered", "paid", "lost"], delivered: ["paid"], paid: [], lost: [] };
+  $("pipeline").innerHTML = `<table><thead><tr><th>Gig</th><th>Status</th><th class="hide-sm">Updated</th><th class="num">Revenue</th><th></th></tr></thead><tbody>` +
+    rows.map((g) => `<tr>
+      <td><div class="t-title">${safeUrl(g.url) ? `<a href="${esc(safeUrl(g.url))}" target="_blank" rel="noopener">${esc(g.title)}</a>` : esc(g.title)}</div>
+        <div class="t-sub">${esc([SOURCE_NAMES[g.source] || g.source, g.company, g.proposal?.price_quote].filter(Boolean).join(" · "))}</div></td>
+      <td>${pill(g.status)}</td><td class="t-sub hide-sm">${ago(g.updated_at)}</td>
+      <td class="num">${g.revenue ? usd(g.revenue) : "–"}</td>
+      <td style="white-space:nowrap">${next[g.status].map((n) => `<button class="small" data-act="${n}" data-uid="${esc(g.uid)}">${n === "paid" ? "Paid…" : n[0].toUpperCase() + n.slice(1)}</button>`).join(" ")}</td>
+    </tr>`).join("") + `</tbody></table>`;
+}
+
+function renderScreened() {
+  const rows = state.screened;
+  const c = state.counts;
+  $("screened-note").textContent = `${(c.shortlisted || 0) + (c.drafted || 0) + (c.building || 0) + (c.demo_ready || 0)} shortlisted · ${c.maybe || 0} maybe · ${c.rejected || 0} passed · ${(c.ignored || 0).toLocaleString()} full-time or stale postings skipped without Claude`;
+  if (!rows.length) { $("screened").innerHTML = `<div class="empty">Nothing screened yet.</div>`; return; }
+  $("screened").innerHTML = `<table><thead><tr><th>Fit</th><th>Gig</th><th class="hide-sm">Why</th><th></th></tr></thead><tbody>` +
+    rows.map((g) => {
+      const a = g.assessment || {};
+      const canPursue = ["maybe", "rejected"].includes(g.status);
+      return `<tr>
+        <td><div class="fitcell"><div class="fitbar"><div style="width:${g.fit}%"></div></div>${g.fit}</div></td>
+        <td><div class="t-title">${safeUrl(g.url) ? `<a href="${esc(safeUrl(g.url))}" target="_blank" rel="noopener">${esc(g.title)}</a>` : esc(g.title)}</div>
+          <div class="t-sub">${esc([SOURCE_NAMES[g.source] || g.source, g.company, a.deliverable].filter(Boolean).join(" · "))} ${pill(g.status)}</div></td>
+        <td class="t-sub hide-sm">${esc(a.reason)}</td>
+        <td>${canPursue ? `<button class="small" data-act="pursue" data-uid="${esc(g.uid)}" title="Shortlist it anyway; the writer drafts a proposal">Pursue</button>` : ""}</td>
+      </tr>`;
+    }).join("") + `</tbody></table>`;
+}
+
+function renderSources() {
+  const entries = Object.entries(state.sources);
+  if (!entries.length) { $("sources").innerHTML = `<div class="empty">First sweep pending…</div>`; return; }
+  $("sources").innerHTML = entries.map(([name, x]) => `<div class="src">
+    <span><span class="pill ${x.ok ? "pos" : "neg"}">${x.ok ? "ok" : "error"}</span> ${esc(SOURCE_NAMES[name] || name)}</span>
+    ${x.ok ? `<span class="n">${x.postings} postings · ${x.new} new · ${x.leads} leads · ${ago(x.ts)}</span>` : `<span class="err">${esc(x.error)} · ${ago(x.ts)}</span>`}
+  </div>`).join("") + (state.sources.reddit ? "" : `<div class="src"><span><span class="pill neutral">off</span> Reddit</span><span class="n">Add REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET to .env</span></div>`);
+}
+
+// --- event log ----------------------------------------------------------------------------
+function addLog(ev) {
+  const a = agentOf(ev.agent);
+  if (filter !== "all" && a.id !== filter) return;
+  const log = $("log");
+  const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+  const line = document.createElement("div");
+  line.className = "line";
+  line.style.setProperty("--agent", color(a.id));
+  line.innerHTML = `<span class="c">${time(ev.ts)} C${ev.cycle}</span><span class="who"><span class="dot" style="background:${color(a.id)}"></span>${esc(a.name)}</span>` +
+    `<span class="c">${esc(kindOf(ev).label)}</span><span class="msg">${esc(ev.message)}</span>`;
+  log.append(line);
+  while (log.children.length > LOG_MAX) log.firstChild.remove();
+  if (atBottom) log.scrollTop = log.scrollHeight;
+}
+function renderLog() { $("log").innerHTML = ""; (state?.events || []).forEach(addLog); $("log").scrollTop = $("log").scrollHeight; }
+function renderFilters() {
+  const opts = [{ id: "all", name: "Everyone" }, ...AGENTS];
+  $("filters").innerHTML = opts.map((a) => `<button data-f="${a.id}" class="${a.id === filter ? "on" : ""}">` +
+    (a.id === "all" ? "" : `<span class="dot" style="background:${color(a.id)}"></span>`) + `${esc(a.name)}</button>`).join("");
+  $("filters").querySelectorAll("button").forEach((b) => b.onclick = () => { filter = b.dataset.f; renderFilters(); renderLog(); });
+}
+
+// --- top-level render -----------------------------------------------------------------------
+function render() {
+  const s = state, c = s.counts;
+  $("status").className = "badge st-" + s.status;
+  $("status-text").textContent = s.status === "running" && s.busy ? "working…" : s.status;
+  $("btn-pause").textContent = s.status === "paused" ? "Resume" : "Pause";
+
+  $("k-leads").textContent = s.found_today.toLocaleString();
+  $("k-leads-sub").textContent = `${s.leads_today.toLocaleString()} freelance or contract leads · ${c.found || 0} waiting`;
+  const shortlisted = (c.shortlisted || 0) + READY_COUNT() + ["applied", "won", "delivered", "paid", "lost", "skipped"].reduce((t, k) => t + (c[k] || 0), 0);
+  $("k-short").textContent = shortlisted;
+  $("k-short-sub").textContent = `${c.maybe || 0} maybe · ${c.rejected || 0} passed`;
+  $("k-ready").textContent = READY_COUNT();
+  $("k-ready-sub").textContent = `${c.demo_ready || 0} with a demo · ${s.demos_today} of ${s.demos_per_day} demos today`;
+  const applied = ["applied", "won", "delivered", "paid", "lost"].reduce((t, k) => t + (c[k] || 0), 0);
+  const won = (c.won || 0) + (c.delivered || 0) + (c.paid || 0);
+  $("k-won").textContent = `${applied} → ${won}`;
+  $("k-won-sub").textContent = won + (c.lost || 0) ? `${Math.round(won / (won + (c.lost || 0)) * 100)}% of decided` : "no decisions yet";
+  $("k-rev").textContent = usd(s.revenue);
+  const net = s.revenue - s.spend_total;
+  $("k-rev-sub").innerHTML = `net of Claude <span class="${net >= 0 ? "up" : "down"}">${usd(net)}</span>`;
+  $("k-cost").textContent = usd(s.spend_today);
+  $("k-cost-bar").style.width = Math.min(100, s.spend_today / s.budget * 100) + "%";
+  $("k-cost-sub").textContent = s.claude_on ? `of ${usd(s.budget)} daily cap · ${usd(s.spend_total)} all time` : "Claude off (no API key)";
+
+  renderReady(); renderPipeline(); renderScreened(); renderSources(); renderAgentStats();
+}
+
+async function refresh() { state = await (await fetch("/api/state")).json(); render(); }
+function scheduleRefresh() { clearTimeout(refreshTimer); refreshTimer = setTimeout(refresh, 200); }
+
+// --- actions (optionally password-protected; the password is remembered in this browser only) ---
+const PW_KEY = "agency-dashboard-password";
+const loadPw = () => { try { return localStorage.getItem(PW_KEY) || ""; } catch { return ""; } };
+const savePw = (v) => { try { v ? localStorage.setItem(PW_KEY, v) : localStorage.removeItem(PW_KEY); } catch {} };
+
+async function post(url, body) {
+  let pw = loadPw();
+  if (state?.controls_locked && !pw) { pw = prompt("Dashboard password:") || ""; if (!pw) return null; }
+  const headers = { "Content-Type": "application/json", ...(pw ? { "X-Agency-Password": pw } : {}) };
+  const resp = await fetch(url, { method: "POST", headers, body: body ? JSON.stringify(body) : undefined });
+  if (resp.status === 401) { savePw(""); alert("Wrong dashboard password."); return null; }
+  if (!resp.ok) { alert("That didn't work: " + (await resp.text())); return null; }
+  if (pw) savePw(pw);
+  scheduleRefresh();
+  return resp.json();
+}
+const gigAction = (uid, action, extra = {}) => post("/api/gig/" + encodeURIComponent(uid).replace(/%2F/g, "/"), { action, ...extra });
+
+document.addEventListener("input", (e) => { if (e.target.matches(".gig textarea")) drafts[e.target.dataset.uid] = e.target.value; });
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("button[data-act]");
+  if (!b) return;
+  const { act, uid } = b.dataset;
+  if (act === "open") { window.open(b.dataset.url, "_blank", "noopener"); return; }
+  if (act === "copy") {
+    const ta = document.querySelector(`.gig textarea[data-uid="${CSS.escape(uid)}"]`);
+    try { await navigator.clipboard.writeText(ta.value); toast("Proposal copied"); }
+    catch { ta.select(); document.execCommand("copy"); toast("Proposal copied"); }
+    return;
+  }
+  if (act === "save") {
+    const ta = document.querySelector(`.gig textarea[data-uid="${CSS.escape(uid)}"]`);
+    if (await gigAction(uid, "save", { message: ta.value })) { delete drafts[uid]; toast("Saved"); }
+    return;
+  }
+  if (act === "paid") {
+    const v = prompt("How much were you paid (USD)?", "");
+    if (v === null) return;
+    const n = parseFloat(v.replace(/[$,]/g, ""));
+    if (isNaN(n)) { alert("Enter a number, like 250"); return; }
+    await gigAction(uid, "paid", { revenue: n });
+    return;
+  }
+  if (act === "skipped" && !confirm("Skip this gig? It leaves the queue.")) return;
+  if (act === "build" && state.spend_today > state.budget - 0.8) toast("Queued. Today's Claude budget is nearly used, so it may wait until tomorrow.");
+  if (await gigAction(uid, act)) {
+    if (act === "build") toast("Demo queued");
+    if (act === "applied") toast("Moved to the pipeline. Good luck!");
+    if (act === "pursue") toast("Shortlisted; the writer drafts it next");
+  }
+});
+
+$("add-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const r = await post("/api/postings", { url: $("add-url").value, title: $("add-title").value, text: $("add-text").value });
+  if (r) { toast(r.added ? "Added; the qualifier screens it now" : "Already have that one"); e.target.reset(); }
+};
+$("btn-pause").onclick = () => post("/api/control/" + (state?.status === "paused" ? "resume" : "pause"));
+$("btn-step").onclick = () => post("/api/control/step");
+
+async function boot() {
+  buildAgents();
+  await refresh();
+  state.events.forEach((ev) => addCard(ev, false));
+  const lastOps = state.events.filter((e) => e.agent === "agency").at(-1);
+  if (lastOps) $("ticker").textContent = lastOps.message;
+  renderFilters(); renderLog();
+
+  const es = new EventSource("/api/stream");
+  es.onopen = () => { $("conn").textContent = "live"; scheduleRefresh(); };
+  es.onerror = () => $("conn").textContent = "reconnecting…";
+  es.onmessage = (m) => {
+    const ev = JSON.parse(m.data);
+    state.events.push(ev);
+    if (state.events.length > LOG_MAX) state.events.shift();
+    addCard(ev); addLog(ev);
+    if (ev.agent === "agency") $("ticker").textContent = ev.message;
+    if (["scan", "summary", "draft", "demo", "cycle", "thinking", "info"].includes(ev.kind) || ev.agent === "you") scheduleRefresh();
+    else renderAgentStats();
+  };
+  setInterval(() => {
+    document.querySelectorAll(".last[data-ts]").forEach((el) => el.textContent = ago(+el.dataset.ts));
+    refresh();
+  }, 30000);
+}
+boot();
+</script>
+</body>
+</html>
